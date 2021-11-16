@@ -3,3 +3,5 @@ public_key.txt
 cert.pem
 privkey.pem
 .idea
+fullchain.pem
+dicobot.log

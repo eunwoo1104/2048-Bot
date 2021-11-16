@@ -1,3 +1,4 @@
+import logging
 import random
 import copy
 import math
@@ -196,8 +197,14 @@ with open('token.txt', 'r') as f:
 with open('public_key.txt', 'r') as f:
     public_key = f.read()
 
-interaction = InteractionClient(auto_register_commands=True, respond_via_endpoint=False)
-server = InteractionWebserver(token, public_key, interaction)
+logger = logging.getLogger('dicobot')
+logging.basicConfig(level=logging.DEBUG)  # DEBUG/INFO/WARNING/ERROR/CRITICAL
+handler = logging.FileHandler(filename=f'dicobot.log', encoding='utf-8', mode='w')
+handler.setFormatter(logging.Formatter('%(asctime)s:%(levelname)s:%(name)s: %(message)s'))
+logger.addHandler(handler)
+
+interaction = InteractionClient(respond_via_endpoint=False)
+server = InteractionWebserver(token, public_key, interaction, application_id=789491883755831318)
 
 
 def create_msg(m):
@@ -251,13 +258,13 @@ games = {}
 
 async def game_over(inter, game):
     await inter.send(create_msg(game.sq) + '\nGame Over! Your final score is: ' + str(game.score),
-                     components=[create_buttons(inter.message.id, disabled=True)])
+                     components=[create_buttons(inter.message.id, disabled=True)], update_message=True)
     del games[int(inter.message.id)]
 
 
 async def on_interaction_error(_, inter: InteractionContext, ex: Exception):
     if isinstance(ex, KeyError):
-        await inter.send("Invalid game session. Start new game.")
+        await inter.send("Invalid game session. Start new game.", ephemeral=True)
     else:
         tb = ''.join(traceback.format_exception(type(ex), ex, ex.__traceback__))
         title = f"Exception while executing command {inter.data.name}" if inter.type.application_command else \
@@ -270,9 +277,10 @@ interaction.execute_error_handler = on_interaction_error
 
 @interaction.component_callback("cancel")
 async def cancel_callback(ctx: InteractionContext):
-    game = games.pop(int(ctx.message.id))
+    game = games[int(ctx.message.id)]
     if ctx.author.id != game.author_id:
         return await ctx.send("This is not your session!", ephemeral=True)
+    game = games.pop(int(ctx.message.id))
     await ctx.send(create_msg(game.sq) + '\nThis game is cancelled. Score: ' + str(game.score),
                    update_message=True, components=[create_buttons(ctx.message.id, disabled=True)])
 
