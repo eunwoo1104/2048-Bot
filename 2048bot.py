@@ -4,7 +4,8 @@ import math
 import dico
 import traceback
 import sys
-from dico_interaction import InteractionClient, InteractionContext
+import ssl
+from dico_interaction import InteractionClient, InteractionContext, InteractionWebserver
 
 
 class UndefinedDirectionError(Exception):
@@ -192,8 +193,11 @@ class Class2048:
 with open('token.txt', 'r') as f:
     token = f.read()
 
-client = dico.Client(token)
-interaction = InteractionClient(client=client, auto_register_commands=True, guild_id_lock=670522521682182155)
+with open('public_key.txt', 'r') as f:
+    public_key = f.read()
+
+interaction = InteractionClient(auto_register_commands=True, respond_via_endpoint=False)
+server = InteractionWebserver(token, public_key, interaction)
 
 
 def create_msg(m):
@@ -251,8 +255,7 @@ async def game_over(inter, game):
     del games[int(inter.message.id)]
 
 
-@client.on()
-async def on_interaction_error(inter: InteractionContext, ex: Exception):
+async def on_interaction_error(_, inter: InteractionContext, ex: Exception):
     if isinstance(ex, KeyError):
         await inter.send("Invalid game session. Start new game.")
     else:
@@ -260,6 +263,9 @@ async def on_interaction_error(inter: InteractionContext, ex: Exception):
         title = f"Exception while executing command {inter.data.name}" if inter.type.application_command else \
             f"Exception while executing callback of {inter.data.custom_id}"
         print(f"{title}:\n{tb}", file=sys.stderr)
+
+
+interaction.execute_error_handler = on_interaction_error
 
 
 @interaction.component_callback("cancel")
@@ -336,24 +342,6 @@ async def start(ctx: InteractionContext):
     await ctx.edit_original_response(content=create_msg(games[int(msg)].sq), components=[create_buttons(int(msg))])
 
 
-client.run()
-
-'''
-<:2:904349077746118706>
-<:4:904349077750292520>
-<:8:904349078345895946>
-<:16:904349077737734144>
-<:32:904349077674786816>
-<:64:904349077716738068>
-<:128:904349077960028191>
-<:256:904349077813219328>
-<:512:904349078421377044>
-<:1024:904349077788049428>
-<:2048:904349077062447114>
-⬛
-'''
-
-'''
-타임아웃 부분 수정하기
-대충 여러 게임 돌려도 안 겹치게 만들기
-'''
+ssl_context = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+ssl_context.load_cert_chain("cert.pem", "privkey.pem")
+server.run(host='0.0.0.0', port=1337, ssl_context=ssl_context)

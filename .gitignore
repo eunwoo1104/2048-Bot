@@ -1,2 +1,5 @@
 token.txt
+public_key.txt
+cert.pem
+privkey.pem
 .idea
